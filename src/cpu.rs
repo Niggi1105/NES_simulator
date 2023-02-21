@@ -107,7 +107,6 @@ impl CPU{
         }else{
             self.reg_x += 1;
         }
-        println!("{:?}",self.reg_x);
         self.update_z_and_c_flag(self.reg_x)
     }
     
@@ -186,42 +185,42 @@ impl CPU{
                 0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.ldy(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 -1;
                 }
                 
                 //LDX
                 0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.ldx(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 -1;
                 }
 
                 //LDA
                 0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.lda(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 -1;
                 }
 
                 //STA
                 0x85 | 0x95 | 0x8D | 0x9D | 0x99 | 0x81 | 0x91 => {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.sta(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 - 1;
                 }
 
                 //STX
                 0x86 | 0x96 | 0x8E => {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.stx(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 - 1;
                 }
 
                 //STY
                 0x84 | 0x94 | 0x8C=> {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
                     self.sty(&op.addr_mode);
-                    self.program_counter += op.bytes as u16;
+                    self.program_counter += op.bytes as u16 -1;
                 }
 
                 //TAX
@@ -310,7 +309,7 @@ mod test {
     cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
 
     assert_eq!(cpu.reg_x, 0xc1)
-}
+    }
 
     #[test]
     fn test_inx_overflow() {
@@ -476,12 +475,11 @@ mod test {
         assert!(cpu.memory[0x02] == 0x01)
     }
 
-
     #[test]
     fn test_sty_0x84(){
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x02, 0x00]);
-        
+
         assert!(cpu.memory[0x02] == 0x01)
     }
 }
