@@ -1,3 +1,5 @@
+use crate::opcodes;
+
 pub struct CPU{
     reg_x: u8,
     reg_y: u8,
@@ -76,19 +78,19 @@ impl CPU{
         }
     }
 
-    fn lda(&mut self, mode: AddressingMode) {
+    fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_address(&mode);
         self.reg_a = self.read_mem(addr);
         self.update_z_and_c_flag(self.reg_a);
     }
 
-    fn ldx(&mut self, mode: AddressingMode){
+    fn ldx(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         self.reg_x = self.read_mem(addr);
         self.update_z_and_c_flag(self.reg_x);
     }
 
-    fn ldy(&mut self, mode: AddressingMode){
+    fn ldy(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         self.reg_y = self.read_mem(addr);
         self.update_z_and_c_flag(self.reg_y);
@@ -118,15 +120,15 @@ impl CPU{
         self.update_z_and_c_flag(self.reg_y)
     }
 
-    fn sta(&mut self, mode: AddressingMode){
+    fn sta(&mut self, mode: &AddressingMode){
         self.memory[self.get_address(&mode) as usize] = self.reg_a;
     }
 
-    fn stx(&mut self, mode: AddressingMode){
+    fn stx(&mut self, mode: &AddressingMode){
         self.memory[self.get_address(&mode) as usize] = self.reg_x;
     }
 
-    fn sty(&mut self, mode: AddressingMode){
+    fn sty(&mut self, mode: &AddressingMode){
         self.memory[self.get_address(&mode) as usize] = self.reg_y;
     }
 
@@ -181,139 +183,45 @@ impl CPU{
                 0x00 => return,
                 
                 //LDY
-                0xA0 => {
-                    self.ldy(AddressingMode::Immediate);
-                    self.program_counter += 1;
-                }
-                0xA4 => {
-                    self.ldy(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0xB4 => {
-                    self.ldy(AddressingMode::ZeroPageX);
-                    self.program_counter += 1;
-                }
-                0xAC => {
-                    self.ldy(AddressingMode::Absolute);
-                    self.program_counter += 2;
-                }
-                0xBC => {
-                    self.ldy(AddressingMode::AbsoluteX);
-                    self.program_counter += 2;
+                0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.ldy(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
                 
                 //LDX
-                0xA2 => {
-                    self.ldx(AddressingMode::Immediate);
-                    self.program_counter += 1;
-                }
-                0xA6 => {
-                    self.ldx(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0xB6 => {
-                    self.ldx(AddressingMode::ZeroPageY);
-                    self.program_counter += 1;
-                }
-                0xAE => {
-                    self.ldx(AddressingMode::Absolute);
-                    self.program_counter += 2;
-                }
-                0xBE => {
-                    self.ldx(AddressingMode::AbsoluteY);
-                    self.program_counter += 2;
+                0xA2 | 0xA6 | 0xB6 | 0xAE | 0xBE => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.ldx(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
 
                 //LDA
-                0xA9 => {
-                    self.lda(AddressingMode::Immediate);
-                    self.program_counter += 1;
-                }
-                0xA5 => {
-                    self.lda(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0xB5 => {
-                    self.lda(AddressingMode::ZeroPageX);
-                    self.program_counter += 1;
-                }
-                0xAD =>{
-                    self.lda(AddressingMode::Absolute);
-                    self.program_counter += 2;
-                }
-                0xBD => {
-                    self.lda(AddressingMode::AbsoluteX);
-                    self.program_counter += 2;
-                }
-                0xB9 => {
-                    self.lda(AddressingMode::AbsoluteY);
-                    self.program_counter += 2;
-                }
-                0xA1 => {
-                    self.lda(AddressingMode::IndirectX);
-                    self.program_counter += 1;
-                }
-                0xB1 => {
-                    self.lda(AddressingMode::IndirectY);
-                    self.program_counter += 1;
+                0xA9 | 0xA5 | 0xB5 | 0xAD | 0xBD | 0xB9 | 0xA1 | 0xB1 => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.lda(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
 
                 //STA
-                0x85 => {
-                    self.sta(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0x95 => {
-                    self.sta(AddressingMode::ZeroPageX);
-                    self.program_counter += 1;
-                }
-                0x8D => {
-                    self.sta(AddressingMode::Absolute);
-                    self.program_counter += 2;
-                }
-                0x9D => {
-                    self.sta(AddressingMode::AbsoluteX);
-                    self.program_counter += 2;
-                }
-                0x99 => {
-                    self.sta(AddressingMode::AbsoluteY);
-                    self.program_counter += 2;
-                }
-                0x81 => {
-                    self.sta(AddressingMode::IndirectX);
-                    self.program_counter += 1;
-                }
-                0x91 => {
-                    self.sta(AddressingMode::IndirectY);
-                    self.program_counter += 1;
+                0x85 | 0x95 | 0x8D | 0x9D | 0x99 | 0x81 | 0x91 => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.sta(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
 
                 //STX
-                0x86 => {
-                    self.stx(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0x96 => {
-                    self.stx(AddressingMode::ZeroPageY);
-                    self.program_counter += 1;
-                }
-                0x8E => {
-                    self.stx(AddressingMode::Absolute);
-                    self.program_counter += 2;
+                0x86 | 0x96 | 0x8E => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.stx(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
 
                 //STY
-                0x84 => {
-                    self.sty(AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0x94 => {
-                    self.sty(AddressingMode::ZeroPageY);
-                    self.program_counter += 1;
-                }
-                0x8C => {
-                    self.sty(AddressingMode::Absolute);
-                    self.program_counter += 2;
+                0x84 | 0x94 | 0x8C=> {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.sty(&op.addr_mode);
+                    self.program_counter += op.bytes as u16;
                 }
 
                 //TAX
@@ -573,7 +481,7 @@ mod test {
     fn test_sty_0x84(){
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x02, 0x00]);
-
+        
         assert!(cpu.memory[0x02] == 0x01)
     }
 }
