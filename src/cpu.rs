@@ -122,6 +122,14 @@ impl CPU{
         self.memory[self.get_address(&mode) as usize] = self.reg_a;
     }
 
+    fn stx(&mut self, mode: AddressingMode){
+        self.memory[self.get_address(&mode) as usize] = self.reg_x;
+    }
+
+    fn sty(&mut self, mode: AddressingMode){
+        self.memory[self.get_address(&mode) as usize] = self.reg_y;
+    }
+
     fn read_mem(&mut self, addr: u16) -> u8{
         self.memory[addr as usize]
     }
@@ -278,6 +286,34 @@ impl CPU{
                 0x91 => {
                     self.sta(AddressingMode::IndirectY);
                     self.program_counter += 1;
+                }
+
+                //STX
+                0x86 => {
+                    self.stx(AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0x96 => {
+                    self.stx(AddressingMode::ZeroPageY);
+                    self.program_counter += 1;
+                }
+                0x8E => {
+                    self.stx(AddressingMode::Absolute);
+                    self.program_counter += 2;
+                }
+
+                //STY
+                0x84 => {
+                    self.sty(AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0x94 => {
+                    self.sty(AddressingMode::ZeroPageY);
+                    self.program_counter += 1;
+                }
+                0x8C => {
+                    self.sty(AddressingMode::Absolute);
+                    self.program_counter += 2;
                 }
 
                 //TAX
@@ -500,7 +536,7 @@ mod test {
     }
  
     #[test]
-    fn test_0xa9_ldx_zero_flag() {
+    fn test_0xa2_ldx_zero_flag() {
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa2, 0x00, 0x00]);
         assert!(cpu.status_reg & 0b0000_0010 == 0b10);
@@ -516,5 +552,28 @@ mod test {
         assert_eq!(cpu.reg_x, 0x55);
     }
 
+    #[test]
+    fn test_sta_0x85(){
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x02, 0x00]);
 
+        assert!(cpu.memory[0x02] == 0x01)
+    }
+
+    #[test]
+    fn test_stx_0x86(){
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa2, 0x01, 0x86, 0x02, 0x00]);
+
+        assert!(cpu.memory[0x02] == 0x01)
+    }
+
+
+    #[test]
+    fn test_sty_0x84(){
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x02, 0x00]);
+
+        assert!(cpu.memory[0x02] == 0x01)
+    }
 }
