@@ -33,15 +33,32 @@ lazy_static::lazy_static!{
         OpCode::new(0x50, "CLI", 1, 2, AddressingMode::NoneAddressing),     //clear Interrupt disable
         OpCode::new(0xB8, "CLV", 1, 2, AddressingMode::NoneAddressing),     //clear Overflow flag
 
-        
         OpCode::new(0xAA, "TAX", 1, 2, AddressingMode::NoneAddressing),     //transfer a to x
         
         OpCode::new(0xE8, "INX", 1, 2, AddressingMode::NoneAddressing),     //increment x reg
         OpCode::new(0xC8, "INY", 1, 2, AddressingMode::NoneAddressing),     //increment y reg
-
+        OpCode::new(0xCA, "DEX", 1, 2, AddressingMode::NoneAddressing),     //decrement x reg
+        OpCode::new(0x88, "DEY", 1, 2, AddressingMode::NoneAddressing),     //decrement y reg
 
         OpCode::new(0x24, "BIT", 2, 3, AddressingMode::ZeroPage),           //bit test
         OpCode::new(0x2C, "BIT", 3, 4, AddressingMode::Absolute),
+
+        OpCode::new(0xC9, "CMP", 2, 2, AddressingMode::Immediate),          //compare accumulator with memory
+        OpCode::new(0xC5, "CMP", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0xD5, "CMP", 2, 4, AddressingMode::ZeroPageX),
+        OpCode::new(0xCD, "CMP", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0xDD, "CMP", 3, 4, AddressingMode::AbsoluteX),
+        OpCode::new(0xD9, "CMP", 3, 4, AddressingMode::AbsoluteY),
+        OpCode::new(0xC1, "CMP", 2, 6, AddressingMode::IndirectX),
+        OpCode::new(0xD1, "CMP", 2, 5, AddressingMode::IndirectY),
+
+        OpCode::new(0xE0, "CPX", 2, 2, AddressingMode::Immediate),          //compare x reg with memory
+        OpCode::new(0xE4, "CPX", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0xEC, "CPX", 3, 4, AddressingMode::Absolute),
+
+        OpCode::new(0xC0, "CPY", 2, 2, AddressingMode::Immediate),          //compare y reg with memory
+        OpCode::new(0xC4, "CPY", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0xCC, "CPY", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0xA0, "LDY", 2, 2, AddressingMode::Immediate),          //load values into y reg
         OpCode::new(0xA4, "LDY", 2, 3, AddressingMode::ZeroPage),
