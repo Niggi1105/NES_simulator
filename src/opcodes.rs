@@ -56,7 +56,16 @@ lazy_static::lazy_static!{
 
         OpCode::new(0x86, "STX", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x96, "STX", 2, 4, AddressingMode::ZeroPageY),
-        OpCode::new(0x8E, "STX", 3, 4, AddressingMode::Absolute)
+        OpCode::new(0x8E, "STX", 3, 4, AddressingMode::Absolute),
+
+        OpCode::new(0x69, "ADC", 2, 2, AddressingMode::Immediate),
+        OpCode::new(0x65, "ADC", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x75, "ADC", 2, 4, AddressingMode::ZeroPageX),
+        OpCode::new(0x6D, "ADC", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x7D, "ADC", 3, 4, AddressingMode::AbsoluteX),
+        OpCode::new(0x79, "ADC", 3, 4, AddressingMode::AbsoluteY),
+        OpCode::new(0x61, "ADC", 2, 6, AddressingMode::IndirectX),
+        OpCode::new(0x71, "ADC", 2, 5, AddressingMode::IndirectY)
     ];
 
     pub static ref OP_MAP: HashMap<u8,&'static OpCode> = {
