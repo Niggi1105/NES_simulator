@@ -4,7 +4,7 @@ pub struct CPU{
     reg_x: u8,
     reg_y: u8,
     reg_a: u8,
-    status_reg: u8,
+    status_reg: u8, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
     program_counter: u16,
     memory: [u8;0xFFFF]
 }
@@ -64,7 +64,7 @@ impl CPU{
         }
     }
     
-    fn update_z_and_c_flag(&mut self,val:u8) {
+    fn update_z_and_neg_flag(&mut self,val:u8) {
         if val == 0 {
             self.status_reg = self.status_reg | 0b0000_0010;
         } else {
@@ -81,24 +81,24 @@ impl CPU{
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_address(&mode);
         self.reg_a = self.read_mem(addr);
-        self.update_z_and_c_flag(self.reg_a);
+        self.update_z_and_neg_flag(self.reg_a);
     }
 
     fn ldx(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         self.reg_x = self.read_mem(addr);
-        self.update_z_and_c_flag(self.reg_x);
+        self.update_z_and_neg_flag(self.reg_x);
     }
 
     fn ldy(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         self.reg_y = self.read_mem(addr);
-        self.update_z_and_c_flag(self.reg_y);
+        self.update_z_and_neg_flag(self.reg_y);
     }
 
     fn tax(&mut self){
         self.reg_x = self.reg_a;
-        self.update_z_and_c_flag(self.reg_x)
+        self.update_z_and_neg_flag(self.reg_x)
     }
 
     fn inx(&mut self){
@@ -107,7 +107,7 @@ impl CPU{
         }else{
             self.reg_x += 1;
         }
-        self.update_z_and_c_flag(self.reg_x)
+        self.update_z_and_neg_flag(self.reg_x)
     }
     
     fn iny(&mut self){
@@ -116,7 +116,7 @@ impl CPU{
         }else{
             self.reg_y += 1;
         }
-        self.update_z_and_c_flag(self.reg_y)
+        self.update_z_and_neg_flag(self.reg_y)
     }
 
     fn sta(&mut self, mode: &AddressingMode){
@@ -152,6 +152,25 @@ impl CPU{
         self.write_mem(addr + 1, hi as u8);
     }
 
+    fn adc(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(&mode);
+        let m = self.read_mem(addr);
+        let n = self.reg_a;
+        self.reg_a = m.wrapping_add(n).wrapping_add(self.status_reg & 0b0000_0001); // add carry if carry flag is set
+        self.update_z_and_neg_flag(self.reg_a.clone());
+        // set overflow flag if overflow occurs
+        if (m^self.reg_a) & (n^self.reg_a) & 0x80 != 0{
+            self.status_reg = self.status_reg | 0b0100_0000;
+        }else{
+            self.status_reg = self.status_reg & 0b1011_1111;
+        }
+        //set c flag
+        if (m & n) >= (((m ^ n) ^ 0xff)- (m&n))  {
+            self.status_reg = self.status_reg | 0b0000_0001;
+        }else{
+            self.status_reg = self.status_reg & 0b1111_1110;
+        }
+    }
     //whipes all registers and sets program counter to addr stored at 0xFFFC
     pub fn reset(&mut self){
         self.reg_a = 0;
@@ -181,6 +200,13 @@ impl CPU{
                 //BRK
                 0x00 => return,
                 
+                //ADC
+                0x69 | 0x65 | 0x75 | 0x6D | 0x7D | 0x79 | 0x61 | 0x71 =>{
+                    let op = *opcodes::OP_MAP.get(&opc).unwrap();
+                    self.adc(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
                 //LDY
                 0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
@@ -481,5 +507,49 @@ mod test {
         cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x02, 0x00]);
 
         assert!(cpu.memory[0x02] == 0x01)
+    }
+
+    #[test]
+    fn test_adc_for_cout(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x0001, 0xff);
+        cpu.load_and_run(vec![0xa9, 0x01, 0x65, 0x01, 0x00]);
+        assert!(cpu.reg_a == 0x00);
+        assert!(cpu.status_reg & 0b1000_0000 == 0);
+        assert!(cpu.status_reg & 0b0000_0001 == 1);
+        assert!(cpu.status_reg & 0b0100_0000 == 0);
+    }
+
+    #[test]
+    fn test_adc_for_oveflow_detection1(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x0001, 0x50);
+        cpu.load_and_run(vec![0xa9, 0x50, 0x65, 0x01, 0x00]);
+        assert!(cpu.reg_a == 0xa0);
+        assert!(cpu.status_reg & 0b1000_0000 != 0);
+        assert!(cpu.status_reg & 0b0000_0001 == 0);
+        assert!(cpu.status_reg & 0b0100_0000 != 0);
+    }
+
+    #[test]
+    fn test_adc_for_oveflow_detection2(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x0001, 0xd0);
+        cpu.load_and_run(vec![0xa9, 0x90, 0x65, 0x01, 0x00]);
+        assert!(cpu.reg_a == 0x60);
+        assert!(cpu.status_reg & 0b1000_0000 == 0);
+        assert!(cpu.status_reg & 0b0000_0001 == 1);
+        assert!(cpu.status_reg & 0b0100_0000 != 0);
+    }
+
+    #[test]
+    fn test_adc_for_oveflow_detection3(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x0001, 0xd0);
+        cpu.load_and_run(vec![0xa9, 0x90, 0x65, 0x01, 0x00]);
+        assert!(cpu.reg_a == 0x60);
+        assert!(cpu.status_reg & 0b1000_0000 == 0);
+        assert!(cpu.status_reg & 0b0000_0001 == 1);
+        assert!(cpu.status_reg & 0b0100_0000 != 0);
     }
 }
