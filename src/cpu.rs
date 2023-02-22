@@ -227,6 +227,12 @@ impl CPU{
         }
     }
 
+    fn and(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(&mode);
+        self.reg_a = self.reg_a &  self.read_mem(addr);
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
     fn bcc(&mut self){
         if !self.status_reg.contains(CpuFlags::CARRY) {
             let offset = self.read_mem(self.program_counter);
@@ -358,6 +364,13 @@ impl CPU{
                     self.program_counter += op.bytes as u16 - 1;
                 }
 
+                //AND
+                0x29 | 0x25 | 0x35 | 0x2D | 0x3D | 0x39 | 0x21 | 0x31 => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.and(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
                 //CLC
                 0x18 => self.status_reg.remove(CpuFlags::CARRY),
 
@@ -398,6 +411,9 @@ impl CPU{
                 0x70 => self.bvs(),
 
                 //BIT
+                0x24 | 0x2C => {
+
+                }
                 
                 //LDY
                 0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
@@ -779,4 +795,14 @@ mod test {
         assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
         assert!(!cpu.status_reg.contains(CpuFlags::OVERFLOW));
     }
+
+    #[test]
+    fn test_and(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b1001_0101,0x29,0b1101_1011, 0x00]);
+        assert_eq!(cpu.reg_a, 0b1001_0001);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+    }
+
+
 }
