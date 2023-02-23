@@ -1,3 +1,4 @@
+/* 
 use nes_emulator::cpu::CPU;
 use rand::Rng;
 use sdl2::event::Event;
@@ -72,14 +73,12 @@ fn main() {
  
     let mut canvas = window.into_canvas().present_vsync().build().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
-    canvas.set_scale(15.0, 15.0).unwrap();
+    canvas.set_scale(10.0, 10.0).unwrap();
 
     //create texture
     let creator = canvas.texture_creator();
     let mut texture = creator
         .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
-
-
 
 
     let game_code = vec![
@@ -114,8 +113,8 @@ fn main() {
     cpu.run_with_callback(move |cpu| {
         handle_user_input(cpu, &mut event_pump);
         cpu.write_mem(0xfe, rng.gen_range(1..16));
- 
         if read_screen_state(cpu, &mut screen_state) {
+            canvas.clear();
             texture.update(None, &screen_state, 32 * 3).unwrap();
             canvas.copy(&texture, None, None).unwrap();
             canvas.present();
@@ -124,3 +123,5 @@ fn main() {
         ::std::thread::sleep(std::time::Duration::new(0,70_000));
     });
 }
+*/
+fn main(){}

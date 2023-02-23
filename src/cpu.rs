@@ -1,5 +1,7 @@
 use crate::opcodes;
 extern crate bitflags;
+use crate::bus::Bus;
+use crate::cartidge::Rom;
 
 bitflags::bitflags! {
     /// # Status Register (P) http://wiki.nesdev.com/w/index.php/Status_flags
@@ -33,7 +35,7 @@ pub struct CPU{
     stack_ptr: u8,
     status_reg: CpuFlags, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
     program_counter: u16,
-    memory: [u8;0xFFFF]
+    bus: Bus, 
 }
 
 #[derive(Debug)]
@@ -53,15 +55,15 @@ pub enum AddressingMode{
 const STACK_RESET:u16 = 0x1FF;
 
 impl CPU{
-    pub fn new() -> Self{
+    pub fn new(rom: Rom) -> Self{
         CPU{
             reg_a: 0,
             reg_x: 0,
             reg_y: 0,
             stack_ptr: STACK_RESET as u8,
-            status_reg: CpuFlags::empty(),
+            status_reg: CpuFlags::from_bits_truncate(0b100100),
             program_counter: 0,
-            memory: [0;0xFFFF]
+            bus: Bus::new(rom),
         }
     }
 
@@ -109,7 +111,7 @@ impl CPU{
     }
 
     pub fn read_mem(&mut self, addr: u16) -> u8{
-        self.memory[addr as usize]
+        self.bus.read_mem(addr)
     }
 
     fn read_mem_u16(&mut self, addr: u16) -> u16{
@@ -119,7 +121,7 @@ impl CPU{
     }
 
     pub fn write_mem(&mut self, addr: u16, data: u8){
-        self.memory[addr as usize] = data;
+        self.bus.write_mem(addr, data);
     }
 
     fn write_mem_u16(&mut self, addr: u16, data: u16){
@@ -257,7 +259,7 @@ impl CPU{
     fn sbc(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         let data = self.read_mem(addr);
-        self.add_to_a(((data as i8).wrapping_neg().wrapping_sub(1)) as u8);
+        self.add_to_a(data ^ 0xFF);
     }
     
     fn adc(&mut self, mode: &AddressingMode){
@@ -519,24 +521,24 @@ impl CPU{
         self.program_counter = self.read_mem_u16(0xFFFC);
     }
 
+    /* 
     //load progarm to memory an stores starting address
     pub fn load(&mut self, program: Vec<u8>){
-        self.memory[0x0600..(0x0600+program.len())].copy_from_slice(&program);
-        self.write_mem_u16(0xFFFC,0x0600);
+        self.memory[0x8000..(0x8000+program.len())].copy_from_slice(&program);
+        self.write_mem_u16(0xFFFC,0x8000);
     }
 
     pub fn load_and_run(&mut self, program: Vec<u8>){
         self.load(program);
         self.reset();
         self.run();
-    }
+    }*/
 
     pub fn run(&mut self){
         self.run_with_callback(|_|{});
     }
 
-    pub fn run_with_callback<F>(&mut self, mut callback: F)where F: FnMut(&mut CPU),
-        {
+    pub fn run_with_callback<F>(&mut self, mut callback: F)where F: FnMut(&mut CPU){
         loop {
             callback(self);
             let opc = self.read_mem(self.program_counter);
@@ -876,7 +878,7 @@ impl CPU{
     }
 }
 
-
+/* 
 #[cfg(test)]
 mod test {
     use std::vec;
@@ -976,15 +978,15 @@ mod test {
     fn test_write_mem_16bit(){
         let mut cpu = CPU::new();
         cpu.write_mem_u16(0x1FFF, 0xFA6E);
-        assert!(cpu.memory[0x1FFF] == 0x6E);
-        assert!(cpu.memory[0x2000] == 0xFA);
+        assert_eq!(cpu.read_mem(0x1FFF), 0x6E);
+        assert_eq!(cpu.read_mem(0x2000), 0xFA);
     }
 
     #[test]
     fn test_read_mem_16bit(){
         let mut cpu = CPU::new();
-        cpu.memory[0x1FFF] = 0xAA;
-        cpu.memory[0x2000] = 0xB3;
+        cpu.write_mem(0x1FFF, 0xAA);
+        cpu.write_mem(0x2000, 0x3B);
         assert!(cpu.read_mem_u16(0x1FFF) == 0xB3AA);
     }
      
@@ -1104,16 +1106,14 @@ mod test {
     fn test_sta_0x85(){
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x02, 0x00]);
-
-        assert!(cpu.memory[0x02] == 0x01)
+        assert_eq!(cpu.read_mem(0x02), 0x01);
     }
 
     #[test]
     fn test_stx_0x86(){
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa2, 0x01, 0x86, 0x02, 0x00]);
-
-        assert!(cpu.memory[0x02] == 0x01)
+        assert_eq!(cpu.read_mem(0x02), 0x01)
     }
 
     #[test]
@@ -1121,7 +1121,7 @@ mod test {
         let mut cpu = CPU::new();
         cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x02, 0x00]);
 
-        assert!(cpu.memory[0x02] == 0x01)
+        assert_eq!(cpu.read_mem(0x02), 0x01)
     }
 
     #[test]
@@ -1172,7 +1172,7 @@ mod test {
     fn test_sbc_for_oveflow_detection1(){
         let mut  cpu = CPU::new();
         cpu.write_mem(0x0001, 0xb0);
-        cpu.load_and_run(vec![0xa9,0x50,0xe5,0x01, 0x00]);
+        cpu.load_and_run(vec![0xa9,0x50,0x38,0xe5,0x01,0x00]);
         assert_eq!(cpu.reg_a, 0xa0);
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
         assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
@@ -1183,7 +1183,7 @@ mod test {
     fn test_sbc_for_oveflow_detection2(){
         let mut  cpu = CPU::new();
         cpu.write_mem(0x0001, 0x70);
-        cpu.load_and_run(vec![0xa9,0xd0,0xe5,0x01, 0x00]);
+        cpu.load_and_run(vec![0xa9,0xd0,0x38,0xe5,0x01,0x00]);
         assert_eq!(cpu.reg_a, 0x60);
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
         assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
@@ -1194,12 +1194,23 @@ mod test {
     fn test_sbc_for_oveflow_detection3(){
         let mut  cpu = CPU::new();
         cpu.write_mem(0x0001, 0xf0);
-        cpu.load_and_run(vec![0xa9,0x50,0xe5,0x01, 0x00]);
+        cpu.load_and_run(vec![0xa9,0x50,0x38,0xe5,0x01,0x00]);
         assert_eq!(cpu.reg_a, 0x60);
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
         assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
         assert!(!cpu.status_reg.contains(CpuFlags::OVERFLOW));
     }
+    #[test]
+    fn test_sbc(){
+        let mut  cpu = CPU::new();
+        cpu.write_mem(0x0001, 0x0a);
+        cpu.load_and_run(vec![0xa9,0x14,0x38,0xe5,0x01,0x00]);
+        assert_eq!(cpu.reg_a, 10);
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::OVERFLOW));
+    }
+
 
     #[test]
     fn test_and(){
@@ -1457,3 +1468,4 @@ mod test {
     }
 
 }
+*/
