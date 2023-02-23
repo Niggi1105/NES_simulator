@@ -18,6 +18,8 @@ impl OpCode {
 lazy_static::lazy_static!{
     pub static ref CPU_OPCODES: Vec<OpCode> = vec![
         OpCode::new(0x00, "BRK", 1, 7, AddressingMode::NoneAddressing),     //break
+
+        OpCode::new(0xEA, "NOP", 1, 2, AddressingMode::NoneAddressing),     //No Operation
         
         OpCode::new(0x90, "BCC", 2, 2, AddressingMode::NoneAddressing),     //branch if carry clear
         OpCode::new(0xB0, "BCS", 2, 2, AddressingMode::NoneAddressing),     //branch if carry set
@@ -33,7 +35,21 @@ lazy_static::lazy_static!{
         OpCode::new(0x50, "CLI", 1, 2, AddressingMode::NoneAddressing),     //clear Interrupt disable
         OpCode::new(0xB8, "CLV", 1, 2, AddressingMode::NoneAddressing),     //clear Overflow flag
 
+        OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoneAddressing),     //set carry flag
+        OpCode::new(0xF8, "SED", 1, 2, AddressingMode::NoneAddressing),     //set Decimal Mode
+        OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoneAddressing),     //set Interrupt disable
+
         OpCode::new(0xAA, "TAX", 1, 2, AddressingMode::NoneAddressing),     //transfer a to x
+        OpCode::new(0xA8, "TAY", 1, 2, AddressingMode::NoneAddressing),     //transfer a to y
+        OpCode::new(0xBA, "TSX", 1, 2, AddressingMode::NoneAddressing),     //transfer stack pointer to x
+        OpCode::new(0x8A, "TXA", 1, 2, AddressingMode::NoneAddressing),     //transfer x to a
+        OpCode::new(0x9A, "TXS", 1, 2, AddressingMode::NoneAddressing),     //transfer x to stack pointer
+        OpCode::new(0x98, "TYA", 1, 2, AddressingMode::NoneAddressing),     //transfer y to a
+
+        OpCode::new(0x48, "PHA", 1, 3, AddressingMode::NoneAddressing),     //push accumulator to stack
+        OpCode::new(0x68, "PLA", 1, 4, AddressingMode::NoneAddressing),     //pull accumulator from stack
+        OpCode::new(0x08, "PHP", 1, 3, AddressingMode::NoneAddressing),     //push status reg to stack
+        OpCode::new(0x28, "PLP", 1, 4, AddressingMode::NoneAddressing),     //pull status reg from stack
         
         OpCode::new(0xE8, "INX", 1, 2, AddressingMode::NoneAddressing),     //increment x reg
         OpCode::new(0xC8, "INY", 1, 2, AddressingMode::NoneAddressing),     //increment y reg
@@ -135,6 +151,24 @@ lazy_static::lazy_static!{
         OpCode::new(0x0E, "ASL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x1E, "ASL", 3, 7, AddressingMode::AbsoluteX),
 
+        OpCode::new(0x4A, "LSR", 1, 2, AddressingMode::NoneAddressing),     //shift right in memory or accumulator
+        OpCode::new(0x46, "LSR", 2, 5, AddressingMode::ZeroPage),        
+        OpCode::new(0x56, "LSR", 2, 6, AddressingMode::ZeroPageX),
+        OpCode::new(0x4E, "LSR", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0x5E, "LSR", 3, 7, AddressingMode::AbsoluteX),
+
+        OpCode::new(0x2A, "ROL", 1, 2, AddressingMode::NoneAddressing),     //rotate left in memory or accumulator
+        OpCode::new(0x26, "ROL", 2, 5, AddressingMode::ZeroPage),        
+        OpCode::new(0x36, "ROL", 2, 6, AddressingMode::ZeroPageX),
+        OpCode::new(0x2E, "ROL", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0x3E, "ROL", 3, 7, AddressingMode::AbsoluteX),
+
+        OpCode::new(0x6A, "ROR", 1, 2, AddressingMode::NoneAddressing),     //rotate right in memory or accumulator
+        OpCode::new(0x66, "ROR", 2, 5, AddressingMode::ZeroPage),        
+        OpCode::new(0x76, "ROR", 2, 6, AddressingMode::ZeroPageX),
+        OpCode::new(0x6E, "ROR", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0x7E, "ROR", 3, 7, AddressingMode::AbsoluteX),
+
         OpCode::new(0x29, "AND", 2, 2, AddressingMode::Immediate),          //bitwise AND accumulator with memory
         OpCode::new(0x25, "AND", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x35, "AND", 2, 4, AddressingMode::ZeroPageX),
@@ -152,6 +186,15 @@ lazy_static::lazy_static!{
         OpCode::new(0x59, "XOR", 3, 4, AddressingMode::AbsoluteY),
         OpCode::new(0x41, "XOR", 2, 6, AddressingMode::IndirectX),
         OpCode::new(0x51, "XOR", 2, 5, AddressingMode::IndirectY),
+
+        OpCode::new(0x09, "ORA", 2, 2, AddressingMode::Immediate),          //bitwise OR accumulator with memory
+        OpCode::new(0x05, "ORA", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x15, "ORA", 2, 4, AddressingMode::ZeroPageX),
+        OpCode::new(0x0D, "ORA", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x1D, "ORA", 3, 4, AddressingMode::AbsoluteX),
+        OpCode::new(0x19, "ORA", 3, 4, AddressingMode::AbsoluteY),
+        OpCode::new(0x01, "ORA", 2, 6, AddressingMode::IndirectX),
+        OpCode::new(0x11, "ORA", 2, 5, AddressingMode::IndirectY),
     ];
 
     pub static ref OP_MAP: HashMap<u8,&'static OpCode> = {

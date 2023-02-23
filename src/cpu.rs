@@ -271,11 +271,58 @@ impl CPU{
         let addr = self.get_address(mode);
         let data = self.read_mem(addr);
         self.write_mem(addr, data << 1);
-        if self.reg_a & 0b1000_0000 != 0{
+        if data & 0b1000_0000 != 0{
             self.status_reg.insert(CpuFlags::CARRY);
         }else{
             self.status_reg.remove(CpuFlags::CARRY);
         }
+        self.update_z_and_neg_flag(data << 1);
+    }
+
+    fn lsr(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+        self.write_mem(addr, data >> 1);
+        if data & 0b0000_0001 != 0{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }else{
+            self.status_reg.remove(CpuFlags::CARRY);
+        }
+        self.update_z_and_neg_flag(data >> 1);
+    }
+
+    fn rol(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let mut data = self.read_mem(addr);
+        let c = self.status_reg.contains(CpuFlags::CARRY);
+        if data & 0b1000_0000 != 0{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }else{
+            self.status_reg.remove(CpuFlags::CARRY);
+        }
+        data = data << 1;
+        if c{
+            data += 1;
+        }
+        self.write_mem(addr, data);
+        self.update_z_and_neg_flag(data );
+    }
+
+    fn ror(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let mut data = self.read_mem(addr);
+        let c = self.status_reg.contains(CpuFlags::CARRY);
+        if data & 0b0000_0001 != 0{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }else{
+            self.status_reg.remove(CpuFlags::CARRY);
+        }
+        data = data >> 1;
+        if c{
+            data += 0b1000_0000;
+        }
+        self.write_mem(addr, data);
+        self.update_z_and_neg_flag(data );
     }
 
     fn and(&mut self, mode: &AddressingMode){
@@ -287,6 +334,12 @@ impl CPU{
     fn eor(&mut self, mode: &AddressingMode){
         let addr = self.get_address(mode);
         self.reg_a = self.reg_a ^ self.read_mem(addr);
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn ora(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        self.reg_a = self.reg_a | self.read_mem(addr);
         self.update_z_and_neg_flag(self.reg_a);
     }
 
@@ -480,6 +533,9 @@ impl CPU{
                     return;
                 }
                 
+                //NOP
+                0xEA => continue,
+
                 //ADC
                 0x69 | 0x65 | 0x75 | 0x6D | 0x7D | 0x79 | 0x61 | 0x71 =>{
                     let op = *opcodes::OP_MAP.get(&opc).unwrap();
@@ -510,6 +566,62 @@ impl CPU{
                     self.program_counter += op.bytes as u16 - 1;
                 }
 
+                //LSR
+                0x4A => {
+                    if self.reg_a & 0b0000_0001 != 0{
+                        self.status_reg.insert(CpuFlags::CARRY);
+                    }else{
+                        self.status_reg.remove(CpuFlags::CARRY);
+                    }
+                    self.reg_a = self.reg_a >> 1;
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+                0x46 | 0x56 | 0x4E | 0x5E => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.lsr(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //ROL
+                0x2A => {
+                    let c = self.status_reg.contains(CpuFlags::CARRY);
+                    if self.reg_a & 0b1000_0000 != 0{
+                        self.status_reg.insert(CpuFlags::CARRY);
+                    }else{
+                        self.status_reg.remove(CpuFlags::CARRY);
+                    }
+                    self.reg_a = self.reg_a << 1;
+                    if c{
+                        self.reg_a += 1;
+                    }
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+                0x26 | 0x36 | 0x2E | 0x3E => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.rol(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //ROR
+                0x6A => {
+                    let c = self.status_reg.contains(CpuFlags::CARRY);
+                    if self.reg_a & 0b0000_0001 != 0{
+                        self.status_reg.insert(CpuFlags::CARRY);
+                    }else{
+                        self.status_reg.remove(CpuFlags::CARRY);
+                    }
+                    self.reg_a = self.reg_a >> 1;
+                    if c{
+                        self.reg_a += 0b1000_0000;
+                    }
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+                0x66 | 0x76 | 0x6E | 0x7E => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self.ror(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
                 //AND
                 0x29 | 0x25 | 0x35 | 0x2D | 0x3D | 0x39 | 0x21 | 0x31 => {
                     let op = opcodes::OP_MAP.get(&opc).unwrap();
@@ -524,14 +636,30 @@ impl CPU{
                     self.program_counter += op.bytes as u16 - 1;
                 }
 
+                //ORA
+                0x09 | 0x05 | 0x15 | 0x0D | 0x1D | 0x19 | 0x01 | 0x11 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.ora(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
                 //CLC
                 0x18 => self.status_reg.remove(CpuFlags::CARRY),
+
+                //SEC
+                0x38 => self.status_reg.insert(CpuFlags::CARRY),
 
                 //CLD
                 0xD8 => self.status_reg.remove(CpuFlags::DECIMAL_MODE),
 
+                //SED
+                0xF8 => self.status_reg.insert(CpuFlags::DECIMAL_MODE),
+
                 //CLI
                 0x58 => self.status_reg.remove(CpuFlags::INTERRUPT_DISABLE),
+
+                //SEI
+                0x78 => self.status_reg.insert(CpuFlags::INTERRUPT_DISABLE),
 
                 //CLV
                 0xB8 => self.status_reg.remove(CpuFlags::OVERFLOW),
@@ -600,6 +728,29 @@ impl CPU{
                 //JSR
                 0x20 => self.jsr(),
 
+                //PHA
+                0x48 => self.push_stack(self.reg_a),
+
+                //PLA
+                0x68 => {
+                    self.reg_a = self.pop_stack();
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+
+                //PHP
+                0x08 => {
+                    self.status_reg.insert(CpuFlags::BREAK);
+                    self.status_reg.insert(CpuFlags::BREAK2);
+                    self.push_stack(self.status_reg.bits());
+                }
+                
+                //PLP
+                0x28 => {
+                    self.status_reg.bits = self.pop_stack();
+                    self.status_reg.remove(CpuFlags::BREAK);
+                    self.status_reg.remove(CpuFlags::BREAK2);
+                }
+
                 //LDY
                 0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
@@ -645,6 +796,33 @@ impl CPU{
                 //TAX
                 0xAA => self.tax(),
                 
+                //TAY
+                0xA8 => {
+                    self.reg_y = self.reg_a;
+                    self.update_z_and_neg_flag(self.reg_y);
+                }
+
+                //TSX
+                0xBA => {
+                    self.reg_x = self.stack_ptr;
+                    self.update_z_and_neg_flag(self.reg_x);
+                }
+
+                //TXA
+                0x8A => {
+                    self.reg_a = self.reg_x;
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+
+                //TXS
+                0x9A => self.stack_ptr = self.reg_x,
+                
+                0x98 => {
+                    self.reg_a = self.reg_y;
+                    self.update_z_and_neg_flag(self.reg_a);
+                }
+
+
                 //INC
                 0xE6 | 0xF6 | 0xEE | 0xFE => {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
@@ -1101,7 +1279,7 @@ mod test {
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
     }
 
-        #[test]
+    #[test]
     fn test_dec2(){
         let mut cpu = CPU::new();
         cpu.write_mem(0x01, 0x01);
@@ -1153,5 +1331,92 @@ mod test {
         assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
     }
-    
+
+    #[test]
+    fn test_php_plp(){
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0x38,0x08,0x18,0x28,0x00]);
+        assert!(cpu.status_reg.contains(CpuFlags::CARRY));
+    }
+
+    #[test]
+    fn test_asl1(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b0101_0011,0x0a, 0x00]);
+        assert_eq!(cpu.reg_a, 0b1010_0110);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_asl2(){
+        let mut  cpu = CPU::new();
+        cpu.write_mem(0x01, 0b0101_0011);
+        cpu.load_and_run(vec![0x06,0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0b1010_0110);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_lsr1(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b0101_0011,0x4a, 0x00]);
+        assert_eq!(cpu.reg_a, 0b0010_1001);
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_lsr2(){
+        let mut  cpu = CPU::new();
+        cpu.write_mem(0x01, 0b0101_0011);
+        cpu.load_and_run(vec![0x46,0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0b0010_1001);
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_rol1(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b0101_0011,0x02a, 0x00]);
+        assert_eq!(cpu.reg_a, 0b1010_0110);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+        assert!(!cpu.status_reg.contains(CpuFlags::CARRY));
+    }
+
+    #[test]
+    fn test_rol2(){
+        let mut  cpu = CPU::new();
+        cpu.write_mem(0x01, 0b1101_0011);
+        cpu.load_and_run(vec![0x38, 0x26, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0b1010_0111);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+        assert!(cpu.status_reg.contains(CpuFlags::CARRY));
+    }    
+
+    #[test]
+    fn test_ror1(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b0101_0010,0x06a, 0x00]);
+        assert_eq!(cpu.reg_a, 0b0010_1001);
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+        assert!(!cpu.status_reg.contains(CpuFlags::CARRY));
+    }
+
+    #[test]
+    fn test_ror2(){
+        let mut  cpu = CPU::new();
+        cpu.write_mem(0x01, 0b1101_0011);
+        cpu.load_and_run(vec![0x38, 0x66, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0b1110_1001);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+        assert!(cpu.status_reg.contains(CpuFlags::CARRY));
+    }    
+
 }
