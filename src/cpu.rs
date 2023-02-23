@@ -30,6 +30,7 @@ pub struct CPU{
     reg_x: u8,
     reg_y: u8,
     reg_a: u8,
+    stack_ptr: u8,
     status_reg: CpuFlags, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
     program_counter: u16,
     memory: [u8;0xFFFF]
@@ -49,12 +50,15 @@ pub enum AddressingMode{
     NoneAddressing
 }
 
+const STACK_RESET:u16 = 0x1FF;
+
 impl CPU{
     pub fn new() -> Self{
         CPU{
             reg_a: 0,
             reg_x: 0,
             reg_y: 0,
+            stack_ptr: STACK_RESET as u8,
             status_reg: CpuFlags::empty(),
             program_counter: 0,
             memory: [0;0xFFFF]
@@ -104,6 +108,47 @@ impl CPU{
         }
     }
 
+    fn read_mem(&mut self, addr: u16) -> u8{
+        self.memory[addr as usize]
+    }
+
+    fn read_mem_u16(&mut self, addr: u16) -> u16{
+        let lo = self.read_mem(addr) as u16;
+        let hi = self.read_mem(addr + 1) as u16;
+        (hi << 8) | (lo as u16)
+    }
+
+    fn write_mem(&mut self, addr: u16, data: u8){
+        self.memory[addr as usize] = data;
+    }
+
+    fn write_mem_u16(&mut self, addr: u16, data: u16){
+        let lo = data & 0x00FF;
+        let hi = (data & 0xFF00) >> 8;
+        self.write_mem(addr, lo as u8);
+        self.write_mem(addr + 1, hi as u8);
+    }
+
+    fn push_stack(&mut self, data: u8){
+        self.write_mem(0x0100 + self.stack_ptr as u16, data);
+        self.stack_ptr -= 1;
+    }
+
+    fn push_stack_u16(&mut self, data: u16){
+        self.write_mem_u16(0x0100 + self.stack_ptr as u16, data);
+        self.stack_ptr -= 2;
+    }
+
+    fn pop_stack(&mut self) -> u8{
+        self.stack_ptr += 1;
+        self.read_mem(0x0100 + self.stack_ptr as u16)
+    }
+
+    fn pop_stack_u16(&mut self) -> u16{
+        self.stack_ptr += 2;
+        self.read_mem_u16(0x0100 + self.stack_ptr as u16)
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_address(&mode);
         self.reg_a = self.read_mem(addr);
@@ -127,6 +172,13 @@ impl CPU{
         self.update_z_and_neg_flag(self.reg_x)
     }
 
+    fn inc(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr).wrapping_add(1);
+        self.write_mem(addr, data);
+        self.update_z_and_neg_flag(data);
+    }
+
     fn inx(&mut self){
         if self.reg_x == 0xFF{
             self.reg_x = 0;
@@ -145,6 +197,13 @@ impl CPU{
         self.update_z_and_neg_flag(self.reg_y)
     }
 
+    fn dec(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr).wrapping_sub(1);
+        self.write_mem(addr, data);
+        self.update_z_and_neg_flag(data);
+    }
+
     fn dex(&mut self){
         self.reg_x = self.reg_x.wrapping_sub(1);
         self.update_z_and_neg_flag(self.reg_x);
@@ -156,36 +215,18 @@ impl CPU{
     }
 
     fn sta(&mut self, mode: &AddressingMode){
-        self.memory[self.get_address(&mode) as usize] = self.reg_a;
+        let addr = self.get_address(&mode);
+        self.write_mem( addr, self.reg_a);
     }
 
     fn stx(&mut self, mode: &AddressingMode){
-        self.memory[self.get_address(&mode) as usize] = self.reg_x;
+        let addr = self.get_address(&mode);
+        self.write_mem( addr, self.reg_x);
     }
 
     fn sty(&mut self, mode: &AddressingMode){
-        self.memory[self.get_address(&mode) as usize] = self.reg_y;
-    }
-
-    fn read_mem(&mut self, addr: u16) -> u8{
-        self.memory[addr as usize]
-    }
-
-    fn read_mem_u16(&mut self, addr: u16) -> u16{
-        let lo = self.read_mem(addr) as u16;
-        let hi = self.read_mem(addr + 1) as u16;
-        (hi << 8) | (lo as u16)
-    }
-
-    fn write_mem(&mut self, addr: u16, data: u8){
-        self.memory[addr as usize] = data;
-    }
-
-    fn write_mem_u16(&mut self, addr: u16, data: u16){
-        let lo = data & 0x00FF;
-        let hi = (data & 0xFF00) >> 8;
-        self.write_mem(addr, lo as u8);
-        self.write_mem(addr + 1, hi as u8);
+        let addr = self.get_address(&mode);
+        self.write_mem( addr, self.reg_y);
     }
 
     fn add_to_a(&mut self, m: u8){
@@ -239,7 +280,13 @@ impl CPU{
 
     fn and(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
-        self.reg_a = self.reg_a &  self.read_mem(addr);
+        self.reg_a = self.reg_a & self.read_mem(addr);
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn eor(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        self.reg_a = self.reg_a ^ self.read_mem(addr);
         self.update_z_and_neg_flag(self.reg_a);
     }
 
@@ -396,6 +443,11 @@ impl CPU{
         }
     }
 
+    fn jsr(&mut self){
+        self.push_stack_u16(self.program_counter + 2);
+        self.program_counter = self.read_mem_u16(self.program_counter);
+    }
+
     //whipes all registers and sets program counter to addr stored at 0xFFFC
     pub fn reset(&mut self){
         self.reg_a = 0;
@@ -419,7 +471,7 @@ impl CPU{
 
     pub fn run(&mut self){
         loop {
-            let opc = self.memory[self.program_counter as usize];
+            let opc = self.read_mem(self.program_counter);
             self.program_counter += 1;
             match opc{
                 //BRK
@@ -462,6 +514,13 @@ impl CPU{
                 0x29 | 0x25 | 0x35 | 0x2D | 0x3D | 0x39 | 0x21 | 0x31 => {
                     let op = opcodes::OP_MAP.get(&opc).unwrap();
                     self.and(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //EOR
+                0x49 | 0x45 | 0x55 | 0x4D | 0x5D | 0x59 | 0x41 | 0x51 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.eor(&op.addr_mode);
                     self.program_counter += op.bytes as u16 - 1;
                 }
 
@@ -529,6 +588,18 @@ impl CPU{
                     self.program_counter += op.bytes as u16 - 1;
                 }
                 
+                //JMP
+                0x4C => {
+                    self.program_counter = self.read_mem_u16(self.program_counter);
+                }
+                0x6C => {
+                    let addr = self.read_mem(self.program_counter) as u16;
+                    self.program_counter = self.read_mem_u16(addr);
+                }
+
+                //JSR
+                0x20 => self.jsr(),
+
                 //LDY
                 0xA0 | 0xA4 | 0xB4 | 0xAC | 0xBC=> {
                     let op = &**opcodes::OP_MAP.get(&opc).unwrap();
@@ -574,11 +645,25 @@ impl CPU{
                 //TAX
                 0xAA => self.tax(),
                 
+                //INC
+                0xE6 | 0xF6 | 0xEE | 0xFE => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self. inc(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+
                 //INX
                 0xE8 => self.inx(),
                 
                 //INY
                 0xC8 => self.iny(),
+
+                //DEC
+                0xC6 | 0xD6 | 0xCE | 0xDE => {
+                    let op = &**opcodes::OP_MAP.get(&opc).unwrap();
+                    self. dec(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
 
                 //DEX
                 0xCA => self.dex(),
@@ -1005,6 +1090,68 @@ mod test {
         assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
     }
+    
+    #[test]
+    fn test_dec1(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x01, 0x00);
+        cpu.load_and_run(vec![0xC6, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0xff);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
 
+        #[test]
+    fn test_dec2(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x01, 0x01);
+        cpu.load_and_run(vec![0xC6, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0x00);
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(cpu.status_reg.contains(CpuFlags::ZERO));
+    }
 
+    #[test]
+    fn test_inc1(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x01, 0xff);
+        cpu.load_and_run(vec![0xE6, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0x00);
+        assert!(!cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_inc2(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x01, 0xfe);
+        cpu.load_and_run(vec![0xE6, 0x01, 0x00]);
+        assert_eq!(cpu.read_mem(0x01), 0xff);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+
+    #[test]
+    fn test_push_pop_stack(){
+        let mut  cpu = CPU::new();
+        cpu.push_stack(0xa1);
+        assert_eq!(cpu.pop_stack(), 0xa1);
+    }
+
+    #[test]
+    fn test_push_pop_stack_u16(){
+        let mut  cpu = CPU::new();
+        cpu.push_stack_u16(0xa1b8);
+        assert_eq!(cpu.pop_stack_u16(), 0xa1b8);
+    }
+
+    #[test]
+    fn test_eor(){
+        let mut  cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9,0b1001_0101,0x49,0b0101_1011, 0x00]);
+        assert_eq!(cpu.reg_a, 0b1100_1110);
+        assert!(cpu.status_reg.contains(CpuFlags::NEGATIV));
+        assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
+    }
+    
 }

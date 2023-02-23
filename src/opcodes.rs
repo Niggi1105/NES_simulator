@@ -40,6 +40,16 @@ lazy_static::lazy_static!{
         OpCode::new(0xCA, "DEX", 1, 2, AddressingMode::NoneAddressing),     //decrement x reg
         OpCode::new(0x88, "DEY", 1, 2, AddressingMode::NoneAddressing),     //decrement y reg
 
+        OpCode::new(0xE6, "INC", 2, 5, AddressingMode::ZeroPage),           //increment memory location
+        OpCode::new(0xF6, "INC", 2, 6, AddressingMode::ZeroPageX),
+        OpCode::new(0xEE, "INC", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0xFE, "INC", 3, 7, AddressingMode::AbsoluteX),
+
+        OpCode::new(0xC6, "DEC", 2, 5, AddressingMode::ZeroPage),           //decrement memory location
+        OpCode::new(0xD6, "DEC", 2, 6, AddressingMode::ZeroPageX),
+        OpCode::new(0xCE, "DEC", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0xDE, "DEC", 3, 7, AddressingMode::AbsoluteX),
+
         OpCode::new(0x24, "BIT", 2, 3, AddressingMode::ZeroPage),           //bit test
         OpCode::new(0x2C, "BIT", 3, 4, AddressingMode::Absolute),
 
@@ -59,6 +69,11 @@ lazy_static::lazy_static!{
         OpCode::new(0xC0, "CPY", 2, 2, AddressingMode::Immediate),          //compare y reg with memory
         OpCode::new(0xC4, "CPY", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0xCC, "CPY", 3, 4, AddressingMode::Absolute),
+
+        OpCode::new(0x4C, "JMP", 3, 3, AddressingMode::Absolute),           //jump to Absolute or Indirect address
+        OpCode::new(0x6C, "JMP", 3, 5, AddressingMode::IndirectX),
+
+        OpCode::new(0x20, "JSR", 3, 6, AddressingMode::Absolute),           //jump to subroutine, save return address to stack
 
         OpCode::new(0xA0, "LDY", 2, 2, AddressingMode::Immediate),          //load values into y reg
         OpCode::new(0xA4, "LDY", 2, 3, AddressingMode::ZeroPage),
@@ -128,6 +143,15 @@ lazy_static::lazy_static!{
         OpCode::new(0x39, "AND", 3, 4, AddressingMode::AbsoluteY),
         OpCode::new(0x21, "AND", 2, 6, AddressingMode::IndirectX),
         OpCode::new(0x31, "AND", 2, 5, AddressingMode::IndirectY),
+
+        OpCode::new(0x49, "XOR", 2, 2, AddressingMode::Immediate),          //bitwise XOR accumulator with memory
+        OpCode::new(0x45, "XOR", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x55, "XOR", 2, 4, AddressingMode::ZeroPageX),
+        OpCode::new(0x4D, "XOR", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x5D, "XOR", 3, 4, AddressingMode::AbsoluteX),
+        OpCode::new(0x59, "XOR", 3, 4, AddressingMode::AbsoluteY),
+        OpCode::new(0x41, "XOR", 2, 6, AddressingMode::IndirectX),
+        OpCode::new(0x51, "XOR", 2, 5, AddressingMode::IndirectY),
     ];
 
     pub static ref OP_MAP: HashMap<u8,&'static OpCode> = {
