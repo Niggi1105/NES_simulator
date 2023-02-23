@@ -108,7 +108,7 @@ impl CPU{
         }
     }
 
-    fn read_mem(&mut self, addr: u16) -> u8{
+    pub fn read_mem(&mut self, addr: u16) -> u8{
         self.memory[addr as usize]
     }
 
@@ -118,7 +118,7 @@ impl CPU{
         (hi << 8) | (lo as u16)
     }
 
-    fn write_mem(&mut self, addr: u16, data: u8){
+    pub fn write_mem(&mut self, addr: u16, data: u8){
         self.memory[addr as usize] = data;
     }
 
@@ -345,8 +345,8 @@ impl CPU{
 
     fn bcc(&mut self){
         if !self.status_reg.contains(CpuFlags::CARRY) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -354,8 +354,8 @@ impl CPU{
 
     fn bcs(&mut self){
         if self.status_reg.contains(CpuFlags::CARRY) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -363,17 +363,19 @@ impl CPU{
 
     fn beq(&mut self){
         if self.status_reg.contains(CpuFlags::ZERO) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            println!("took branch");
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
+            println!("didnt take branch");
             self.program_counter += 1;
         }
     }
 
     fn bne(&mut self){
         if !self.status_reg.contains(CpuFlags::ZERO) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -381,8 +383,8 @@ impl CPU{
 
     fn bmi(&mut self){
         if self.status_reg.contains(CpuFlags::NEGATIV) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -390,8 +392,8 @@ impl CPU{
     
     fn bpl(&mut self){
         if !self.status_reg.contains(CpuFlags::NEGATIV) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -399,8 +401,8 @@ impl CPU{
 
     fn bvc(&mut self){
         if !self.status_reg.contains(CpuFlags::OVERFLOW) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -408,8 +410,8 @@ impl CPU{
 
     fn bvs(&mut self){
         if self.status_reg.contains(CpuFlags::OVERFLOW) {
-            let offset = self.read_mem(self.program_counter);
-            self.program_counter += offset as u16;
+            let offset = self.read_mem(self.program_counter) as i8;
+            self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
             self.program_counter += 1;
         }
@@ -501,6 +503,16 @@ impl CPU{
         self.program_counter = self.read_mem_u16(self.program_counter);
     }
 
+    fn rts(&mut self){
+        self.program_counter = self.pop_stack_u16();
+    }
+    
+    fn rti(&mut self){
+        self.status_reg.bits = self.pop_stack();
+        self.status_reg.remove(CpuFlags::BREAK);
+        self.status_reg.remove(CpuFlags::BREAK2);
+        self.program_counter = self.pop_stack_u16();
+    }
     //whipes all registers and sets program counter to addr stored at 0xFFFC
     pub fn reset(&mut self){
         self.reg_a = 0;
@@ -512,8 +524,8 @@ impl CPU{
 
     //load progarm to memory an stores starting address
     pub fn load(&mut self, program: Vec<u8>){
-        self.memory[0x8000..(0x8000+program.len())].copy_from_slice(&program);
-        self.write_mem_u16(0xFFFC,0x8000);
+        self.memory[0x0600..(0x0600+program.len())].copy_from_slice(&program);
+        self.write_mem_u16(0xFFFC,0x0600);
     }
 
     pub fn load_and_run(&mut self, program: Vec<u8>){
@@ -523,8 +535,15 @@ impl CPU{
     }
 
     pub fn run(&mut self){
+        self.run_with_callback(|_|{});
+    }
+
+    pub fn run_with_callback<F>(&mut self, mut callback: F)where F: FnMut(&mut CPU),
+        {
         loop {
+            callback(self);
             let opc = self.read_mem(self.program_counter);
+            println!("run: {:x?}: {}: {:x?}",self.program_counter, opcodes::OP_MAP.get(&opc).unwrap().name, opc);
             self.program_counter += 1;
             match opc{
                 //BRK
@@ -725,6 +744,12 @@ impl CPU{
                     self.program_counter = self.read_mem_u16(addr);
                 }
 
+                //RTI
+                0x40 => self.rti(),
+
+                //RTS
+                0x60 => self.rts(),
+
                 //JSR
                 0x20 => self.jsr(),
 
@@ -816,12 +841,12 @@ impl CPU{
 
                 //TXS
                 0x9A => self.stack_ptr = self.reg_x,
-                
+
+                //TYA
                 0x98 => {
                     self.reg_a = self.reg_y;
                     self.update_z_and_neg_flag(self.reg_a);
                 }
-
 
                 //INC
                 0xE6 | 0xF6 | 0xEE | 0xFE => {
@@ -1418,5 +1443,21 @@ mod test {
         assert!(!cpu.status_reg.contains(CpuFlags::ZERO));
         assert!(cpu.status_reg.contains(CpuFlags::CARRY));
     }    
+
+    #[test]
+    fn test_subroutines(){
+        let mut cpu = CPU::new();
+        cpu.write_mem(0x8020, 0xc8);
+        cpu.write_mem(0x8021, 0x60);
+        cpu.load_and_run(vec![0xa0,0x10,0x20,0x20,0x80,0x00]);
+        assert_eq!(cpu.reg_y, 0x11);
+    }
+
+    #[test]
+    fn test_branching(){
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa0,0x10,0x38,0xb0,0x02,0x00,0x00,0xc8,0x00]);
+        assert_eq!(cpu.reg_y, 0x11);
+    }
 
 }

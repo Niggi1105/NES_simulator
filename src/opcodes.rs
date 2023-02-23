@@ -90,6 +90,9 @@ lazy_static::lazy_static!{
         OpCode::new(0x6C, "JMP", 3, 5, AddressingMode::IndirectX),
 
         OpCode::new(0x20, "JSR", 3, 6, AddressingMode::Absolute),           //jump to subroutine, save return address to stack
+        OpCode::new(0x60, "RTS", 1, 6, AddressingMode::NoneAddressing),     //return from subroutine
+
+        OpCode::new(0x40, "RTI", 1, 6, AddressingMode::NoneAddressing),     //return from Interrupt
 
         OpCode::new(0xA0, "LDY", 2, 2, AddressingMode::Immediate),          //load values into y reg
         OpCode::new(0xA4, "LDY", 2, 3, AddressingMode::ZeroPage),
