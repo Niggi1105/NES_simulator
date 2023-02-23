@@ -19,9 +19,9 @@ fn color(byte: u8) -> Color {
         7 | 14 => sdl2::pixels::Color::YELLOW,
         _ => sdl2::pixels::Color::CYAN,
     }
- }
+}
 
- fn read_screen_state(cpu: &mut CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
+fn read_screen_state(cpu: &mut CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     let mut frame_idx = 0;
     let mut update = false;
     for i in 0x0200..0x600 {
@@ -36,7 +36,7 @@ fn color(byte: u8) -> Color {
         frame_idx += 3;
     }
     update
- }
+}
 
 fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) {
     for event in event_pump.poll_iter() {
@@ -72,7 +72,7 @@ fn main() {
  
     let mut canvas = window.into_canvas().present_vsync().build().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
-    canvas.set_scale(10.0, 10.0).unwrap();
+    canvas.set_scale(15.0, 15.0).unwrap();
 
     //create texture
     let creator = canvas.texture_creator();

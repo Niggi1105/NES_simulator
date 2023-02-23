@@ -257,8 +257,7 @@ impl CPU{
     fn sbc(&mut self, mode: &AddressingMode){
         let addr = self.get_address(&mode);
         let data = self.read_mem(addr);
-        self.add_to_a(((data ^ 0xff) + 1) as u8)
-
+        self.add_to_a(((data as i8).wrapping_neg().wrapping_sub(1)) as u8);
     }
     
     fn adc(&mut self, mode: &AddressingMode){
@@ -363,11 +362,9 @@ impl CPU{
 
     fn beq(&mut self){
         if self.status_reg.contains(CpuFlags::ZERO) {
-            println!("took branch");
             let offset = self.read_mem(self.program_counter) as i8;
             self.program_counter = self.program_counter.wrapping_add(offset as u16).wrapping_add(1);
         }else{
-            println!("didnt take branch");
             self.program_counter += 1;
         }
     }
@@ -543,7 +540,6 @@ impl CPU{
         loop {
             callback(self);
             let opc = self.read_mem(self.program_counter);
-            println!("run: {:x?}: {}: {:x?}",self.program_counter, opcodes::OP_MAP.get(&opc).unwrap().name, opc);
             self.program_counter += 1;
             match opc{
                 //BRK
