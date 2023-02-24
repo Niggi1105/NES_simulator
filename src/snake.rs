@@ -10,6 +10,7 @@ use rand;
 use crate::cpu::CPU;
 use crate::cartridge;
 use crate::bus;
+use crate::log;
 
 fn color(byte: u8) -> Color {
     match byte {
@@ -96,6 +97,7 @@ pub fn snake() {
 
     cpu.run_with_callback(move |cpu| {
         handle_user_input(cpu, &mut event_pump);
+        println!("{}",log::log(cpu));
         cpu.write_mem(0xfe, rng.gen_range(1..16));
         if read_screen_state(cpu, &mut screen_state) {
             canvas.clear();

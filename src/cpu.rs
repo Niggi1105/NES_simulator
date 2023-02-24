@@ -28,13 +28,13 @@ bitflags::bitflags! {
 }
 
 pub struct CPU{
-    reg_x: u8,
-    reg_y: u8,
-    reg_a: u8,
-    stack_ptr: u8,
-    status_reg: CpuFlags, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
-    program_counter: u16,
-    bus: bus::Bus
+    pub reg_x: u8,
+    pub reg_y: u8,
+    pub reg_a: u8,
+    pub stack_ptr: u8,
+    pub status_reg: CpuFlags, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
+    pub program_counter: u16,
+    pub bus: bus::Bus
 }
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ pub enum AddressingMode{
     NoneAddressing
 }
 
-const STACK_RESET:u16 = 0x1FF;
+const STACK_RESET:u16 = 0x1Fd;
 
 impl CPU{
     pub fn new(bus: bus::Bus) -> Self{
@@ -60,13 +60,13 @@ impl CPU{
             reg_x: 0,
             reg_y: 0,
             stack_ptr: STACK_RESET as u8,
-            status_reg: CpuFlags::empty(),
+            status_reg: CpuFlags::from_bits_truncate(0b100_100),
             program_counter: 0,
             bus: bus
         }
     }
 
-    fn get_address(&mut self, mode: &AddressingMode) -> u16 {
+    pub fn get_address(&mut self, mode: &AddressingMode) -> u16 {
         match mode{
             AddressingMode::Immediate => self.program_counter,
             AddressingMode::ZeroPage => self.read_mem(self.program_counter) as u16,
@@ -113,7 +113,7 @@ impl CPU{
         self.bus.read_mem(addr)
     }
 
-    fn read_mem_u16(&mut self, addr: u16) -> u16{
+    pub fn read_mem_u16(&mut self, addr: u16) -> u16{
         let lo = self.read_mem(addr) as u16;
         let hi = self.read_mem(addr + 1) as u16;
         (hi << 8) | (lo as u16)
@@ -536,8 +536,7 @@ impl CPU{
         self.run_with_callback(|_|{});
     }
 
-    pub fn run_with_callback<F>(&mut self, mut callback: F)where F: FnMut(&mut CPU),
-        {
+    pub fn run_with_callback<F>(&mut self, mut callback: F)where F: FnMut(&mut CPU){
         loop {
             callback(self);
             let opc = self.read_mem(self.program_counter);
@@ -875,6 +874,7 @@ impl CPU{
             }
         }
     }
+
 }
 
 /* 
