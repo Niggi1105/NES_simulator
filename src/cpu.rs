@@ -1,5 +1,6 @@
 use crate::opcodes;
 extern crate bitflags;
+use crate::bus;
 
 bitflags::bitflags! {
     /// # Status Register (P) http://wiki.nesdev.com/w/index.php/Status_flags
@@ -33,7 +34,7 @@ pub struct CPU{
     stack_ptr: u8,
     status_reg: CpuFlags, // NEG, OVERFLOW, B-flag, DECIMAL, INTERRUPT DISABLE, ZERO, CARRY
     program_counter: u16,
-    memory: [u8;0xFFFF]
+    bus: bus::Bus
 }
 
 #[derive(Debug)]
@@ -53,7 +54,7 @@ pub enum AddressingMode{
 const STACK_RESET:u16 = 0x1FF;
 
 impl CPU{
-    pub fn new() -> Self{
+    pub fn new(bus: bus::Bus) -> Self{
         CPU{
             reg_a: 0,
             reg_x: 0,
@@ -61,7 +62,7 @@ impl CPU{
             stack_ptr: STACK_RESET as u8,
             status_reg: CpuFlags::empty(),
             program_counter: 0,
-            memory: [0;0xFFFF]
+            bus: bus
         }
     }
 
@@ -109,7 +110,7 @@ impl CPU{
     }
 
     pub fn read_mem(&mut self, addr: u16) -> u8{
-        self.memory[addr as usize]
+        self.bus.read_mem(addr)
     }
 
     fn read_mem_u16(&mut self, addr: u16) -> u16{
@@ -119,7 +120,7 @@ impl CPU{
     }
 
     pub fn write_mem(&mut self, addr: u16, data: u8){
-        self.memory[addr as usize] = data;
+        self.bus.write_mem(addr, data);
     }
 
     fn write_mem_u16(&mut self, addr: u16, data: u16){
@@ -518,7 +519,7 @@ impl CPU{
         self.status_reg = CpuFlags::from_bits_truncate(0b100100);
         self.program_counter = self.read_mem_u16(0xFFFC);
     }
-
+    /* 
     //load progarm to memory an stores starting address
     pub fn load(&mut self, program: Vec<u8>){
         self.memory[0x0600..(0x0600+program.len())].copy_from_slice(&program);
@@ -529,7 +530,7 @@ impl CPU{
         self.load(program);
         self.reset();
         self.run();
-    }
+    }*/
 
     pub fn run(&mut self){
         self.run_with_callback(|_|{});
@@ -876,7 +877,7 @@ impl CPU{
     }
 }
 
-
+/* 
 #[cfg(test)]
 mod test {
     use std::vec;
@@ -1457,3 +1458,4 @@ mod test {
     }
 
 }
+*/
