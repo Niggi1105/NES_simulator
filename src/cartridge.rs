@@ -12,8 +12,8 @@ pub struct Rom {
    pub screen_mirroring: Mirroring,
 }
 
-const PRG_ROM_PAGE_SIZE: usize = 0x3FFF;
-const CHR_ROM_PAGE_SIZE: usize = 0x1FFF;
+const PRG_ROM_PAGE_SIZE: usize = 16384;
+const CHR_ROM_PAGE_SIZE: usize = 8192;
 
 impl Rom {
     pub fn new(raw: &Vec<u8>) -> Result<Rom, String> {

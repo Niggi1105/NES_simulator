@@ -32,7 +32,7 @@ lazy_static::lazy_static!{
 
         OpCode::new(0x18, "CLC", 1, 2, AddressingMode::NoneAddressing),     //clear carry flag
         OpCode::new(0xD8, "CLD", 1, 2, AddressingMode::NoneAddressing),     //clear Decimal Mode
-        OpCode::new(0x50, "CLI", 1, 2, AddressingMode::NoneAddressing),     //clear Interrupt disable
+        OpCode::new(0x58, "CLI", 1, 2, AddressingMode::NoneAddressing),     //clear Interrupt disable
         OpCode::new(0xB8, "CLV", 1, 2, AddressingMode::NoneAddressing),     //clear Overflow flag
 
         OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoneAddressing),     //set carry flag
@@ -119,6 +119,7 @@ lazy_static::lazy_static!{
         OpCode::new(0x95, "STA", 2, 4, AddressingMode::ZeroPageX),
         OpCode::new(0x8D, "STA", 3, 4, AddressingMode::Absolute),
         OpCode::new(0x9D, "STA", 3, 5, AddressingMode::AbsoluteX),
+        OpCode::new(0x99, "STA", 3, 5, AddressingMode::AbsoluteY),
         OpCode::new(0x81, "STA", 2, 6, AddressingMode::IndirectX),
         OpCode::new(0x91, "STA", 2, 6, AddressingMode::IndirectY),
 
@@ -181,14 +182,14 @@ lazy_static::lazy_static!{
         OpCode::new(0x21, "AND", 2, 6, AddressingMode::IndirectX),
         OpCode::new(0x31, "AND", 2, 5, AddressingMode::IndirectY),
 
-        OpCode::new(0x49, "XOR", 2, 2, AddressingMode::Immediate),          //bitwise XOR accumulator with memory
-        OpCode::new(0x45, "XOR", 2, 3, AddressingMode::ZeroPage),
-        OpCode::new(0x55, "XOR", 2, 4, AddressingMode::ZeroPageX),
-        OpCode::new(0x4D, "XOR", 3, 4, AddressingMode::Absolute),
-        OpCode::new(0x5D, "XOR", 3, 4, AddressingMode::AbsoluteX),
-        OpCode::new(0x59, "XOR", 3, 4, AddressingMode::AbsoluteY),
-        OpCode::new(0x41, "XOR", 2, 6, AddressingMode::IndirectX),
-        OpCode::new(0x51, "XOR", 2, 5, AddressingMode::IndirectY),
+        OpCode::new(0x49, "EOR", 2, 2, AddressingMode::Immediate),          //bitwise XOR accumulator with memory
+        OpCode::new(0x45, "EOR", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x55, "EOR", 2, 4, AddressingMode::ZeroPageX),
+        OpCode::new(0x4D, "EOR", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x5D, "EOR", 3, 4, AddressingMode::AbsoluteX),
+        OpCode::new(0x59, "EOR", 3, 4, AddressingMode::AbsoluteY),
+        OpCode::new(0x41, "EOR", 2, 6, AddressingMode::IndirectX),
+        OpCode::new(0x51, "EOR", 2, 5, AddressingMode::IndirectY),
 
         OpCode::new(0x09, "ORA", 2, 2, AddressingMode::Immediate),          //bitwise OR accumulator with memory
         OpCode::new(0x05, "ORA", 2, 3, AddressingMode::ZeroPage),

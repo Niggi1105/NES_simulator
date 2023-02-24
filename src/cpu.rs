@@ -84,9 +84,9 @@ impl CPU{
             }
             // uses zero page address to access address and adds the y register to the result
             AddressingMode::IndirectY =>{
-                let base = self.read_mem(self.program_counter) as u16;
-                let lo = self.read_mem(base) as u16;
-                let hi = self.read_mem(base.wrapping_add(1)) as u16;
+                let base = self.read_mem(self.program_counter);
+                let lo = self.read_mem(base as u16) as u16;
+                let hi = self.read_mem(base.wrapping_add(1) as u16) as u16;
                 ((hi << 8) | lo).wrapping_add(self.reg_y as u16)
             }
             AddressingMode::NoneAddressing => {
@@ -115,7 +115,7 @@ impl CPU{
 
     pub fn read_mem_u16(&mut self, addr: u16) -> u16{
         let lo = self.read_mem(addr) as u16;
-        let hi = self.read_mem(addr + 1) as u16;
+        let hi = self.read_mem(addr.wrapping_add(1)) as u16;
         (hi << 8) | (lo as u16)
     }
 
@@ -132,22 +132,26 @@ impl CPU{
 
     fn push_stack(&mut self, data: u8){
         self.write_mem(0x0100 + self.stack_ptr as u16, data);
-        self.stack_ptr -= 1;
+        self.stack_ptr = self.stack_ptr.wrapping_sub(1);
     }
 
     fn push_stack_u16(&mut self, data: u16){
-        self.write_mem_u16(0x0100 + self.stack_ptr as u16, data);
-        self.stack_ptr -= 2;
+        let hi = (data >> 8) as u8;
+        let lo = (data & 0xff) as u8;
+        self.push_stack(hi);
+        self.push_stack(lo);
     }
 
     fn pop_stack(&mut self) -> u8{
-        self.stack_ptr += 1;
+        self.stack_ptr = self.stack_ptr.wrapping_add(1);
         self.read_mem(0x0100 + self.stack_ptr as u16)
     }
 
     fn pop_stack_u16(&mut self) -> u16{
-        self.stack_ptr += 2;
-        self.read_mem_u16(0x0100 + self.stack_ptr as u16)
+        let lo = self.pop_stack() as u16;
+        let hi = self.pop_stack() as u16;
+
+        hi << 8 | lo
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -417,19 +421,20 @@ impl CPU{
 
     fn bit(&mut self, mode: &AddressingMode){
         let addr = self.get_address(mode);
-        let r = self.reg_a & self.read_mem(addr);
+        let data = self.read_mem(addr);
+        let r = self.reg_a & data;
         if r == 0 {
             self.status_reg.insert(CpuFlags::ZERO);
         }
         else{
             self.status_reg.remove(CpuFlags::ZERO);
         }
-        if r & 0b1000_0000 != 0{
+        if data & 0b1000_0000 != 0{
             self.status_reg.insert(CpuFlags::NEGATIV);
         }else{
             self.status_reg.remove(CpuFlags::NEGATIV);
         }
-        if r & 0b0100_0000 != 0{
+        if data & 0b0100_0000 != 0{
             self.status_reg.insert(CpuFlags::OVERFLOW);
         }else{
             self.status_reg.remove(CpuFlags::OVERFLOW);
@@ -497,18 +502,18 @@ impl CPU{
     }
 
     fn jsr(&mut self){
-        self.push_stack_u16(self.program_counter + 2);
+        self.push_stack_u16(self.program_counter + 1);
         self.program_counter = self.read_mem_u16(self.program_counter);
     }
 
     fn rts(&mut self){
-        self.program_counter = self.pop_stack_u16();
+        self.program_counter = self.pop_stack_u16() + 1;
     }
     
     fn rti(&mut self){
         self.status_reg.bits = self.pop_stack();
         self.status_reg.remove(CpuFlags::BREAK);
-        self.status_reg.remove(CpuFlags::BREAK2);
+        self.status_reg.insert(CpuFlags::BREAK2);
         self.program_counter = self.pop_stack_u16();
     }
     //whipes all registers and sets program counter to addr stored at 0xFFFC
@@ -736,8 +741,15 @@ impl CPU{
                     self.program_counter = self.read_mem_u16(self.program_counter);
                 }
                 0x6C => {
-                    let addr = self.read_mem(self.program_counter) as u16;
-                    self.program_counter = self.read_mem_u16(addr);
+                    let addr = self.read_mem_u16(self.program_counter);
+                    let indirect_ref = if addr & 0x00FF == 0x00FF {
+                        let lo = self.read_mem(addr);
+                        let hi = self.read_mem(addr & 0xFF00);
+                        (hi as u16) << 8 | (lo as u16)
+                    } else {
+                        self.read_mem_u16(addr)
+                    };
+                    self.program_counter = indirect_ref;
                 }
 
                 //RTI
@@ -760,16 +772,17 @@ impl CPU{
 
                 //PHP
                 0x08 => {
-                    self.status_reg.insert(CpuFlags::BREAK);
-                    self.status_reg.insert(CpuFlags::BREAK2);
-                    self.push_stack(self.status_reg.bits());
+                    let mut f = self.status_reg.clone();
+                    f.insert(CpuFlags::BREAK);
+                    f.insert(CpuFlags::BREAK2);
+                    self.push_stack(f.bits());
                 }
                 
                 //PLP
                 0x28 => {
                     self.status_reg.bits = self.pop_stack();
                     self.status_reg.remove(CpuFlags::BREAK);
-                    self.status_reg.remove(CpuFlags::BREAK2);
+                    self.status_reg.insert(CpuFlags::BREAK2);
                 }
 
                 //LDY

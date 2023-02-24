@@ -10,7 +10,11 @@ pub fn log(cpu: &mut CPU) -> String{
     let mut tmp = String::new();
     hexdump.push(opc);
     match op.bytes {
-        1 => {}
+        1 => {
+            if op.name == "ROL" || op.name == "ROR" || op.name == "LSR" || op.name == "ASL"{
+                tmp.push('A');
+            }
+        }
         2 => {
             match op.addr_mode{
                 AddressingMode::Immediate => {
@@ -44,7 +48,9 @@ pub fn log(cpu: &mut CPU) -> String{
                 }
                 AddressingMode::IndirectX => {
                     let addr = cpu.read_mem(pc + 1);
-                    let real_addr = cpu.read_mem_u16(addr.wrapping_add(cpu.reg_x) as u16);
+                    let lo = cpu.read_mem(addr.wrapping_add(cpu.reg_x) as u16) as u16;
+                    let hi = cpu.read_mem(addr.wrapping_add(cpu.reg_x).wrapping_add(1) as u16) as u16;
+                    let real_addr = hi << 8 | lo;
                     tmp.push_str(&format!("(${:02x},X) @ {:02x} = {:04x} = {:02x}",
                     addr, 
                     addr.wrapping_add(cpu.reg_x), 
@@ -54,7 +60,9 @@ pub fn log(cpu: &mut CPU) -> String{
                 }
                 AddressingMode::IndirectY => {
                     let addr = cpu.read_mem(pc + 1);
-                    let pt_addr = cpu.read_mem_u16(addr as u16);
+                    let lo = cpu.read_mem(addr as u16) as u16;
+                    let hi = cpu.read_mem(addr.wrapping_add(1) as u16) as u16;
+                    let pt_addr = hi << 8 | lo;
                     tmp.push_str(&format!("(${:02x}),Y = {:04x} @ {:04x} = {:02x}",
                     addr, 
                     pt_addr, 
@@ -93,10 +101,17 @@ pub fn log(cpu: &mut CPU) -> String{
                 }
                 AddressingMode::IndirectX => {
                     let addr = cpu.read_mem_u16(pc + 1);
-                    let real_addr = cpu.read_mem_u16(addr);
-                    tmp.push_str(&format!("(${:04x}) = {}",addr, real_addr));
+                    let jmp_addr = if addr & 0x00FF == 0x00FF {
+                        let lo = cpu.read_mem(addr);
+                        let hi = cpu.read_mem(addr & 0xFF00);
+                        (hi as u16) << 8 | (lo as u16)
+                    } else {
+                        cpu.read_mem_u16(addr)
+                    };
                     hexdump.push(cpu.read_mem(pc + 1));
                     hexdump.push(cpu.read_mem(pc + 2));
+                    // let jmp_addr = cpu.mem_read_u16(address);
+                    tmp.push_str(&format!("(${:04x}) = {:04x}", addr, jmp_addr));
                 }
                 _ => panic!("Invalid operation")
             }
