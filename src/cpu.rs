@@ -516,6 +516,186 @@ impl CPU{
         self.status_reg.insert(CpuFlags::BREAK2);
         self.program_counter = self.pop_stack_u16();
     }
+   
+   
+    //UNDOCUMENTED
+
+    fn aac(&mut self){
+        let data = self.read_mem(self.program_counter);
+        self.reg_a = self.reg_a & data;
+        self.update_z_and_neg_flag(self.reg_a);
+        self.status_reg.set(CpuFlags::CARRY, self.reg_a & 0b1000_0000 == 1);
+        self.program_counter += 1;
+    }
+
+    fn aax(&mut self, mode: &AddressingMode){
+        let addr =self.get_address(mode);
+        self.write_mem(addr, self.reg_x & self.reg_a);
+    }
+
+    fn arr(&mut self){
+        let data = self.read_mem(self.program_counter);
+        self.reg_a = self.reg_a & data;
+        let c = self.status_reg.contains(CpuFlags::CARRY);
+        if self.reg_a & 1 == 1{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }
+        let mut r = self.reg_a >> 1;
+        if c{
+            r = r | 0b1000_0000;
+        }
+        let b5 = r & 0b0001_0000;
+        let b6 = r & 0b0010_0000;
+
+        if b6 == 1{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }else{
+            self.status_reg.remove(CpuFlags::CARRY);
+        }
+
+        if b5 ^ b6 == 1{
+            self.status_reg.insert(CpuFlags::OVERFLOW);
+        }else{
+            self.status_reg.remove(CpuFlags::OVERFLOW);
+        }
+        self.update_z_and_neg_flag(r);
+        self.reg_a = r;
+        self.program_counter += 1;
+    }
+   
+    fn asr(&mut self){
+        let data = self.read_mem(self.program_counter);
+        self.reg_a = self.reg_a & data;
+        self.status_reg.set(CpuFlags::CARRY, self.reg_a & 1 == 1);
+        self.reg_a = self.reg_a >> 1;
+        self.update_z_and_neg_flag(self.reg_a);
+        self.program_counter += 1;
+    }
+
+    fn atx(&mut self){
+        let data = self.read_mem(self.program_counter);
+        self.reg_a = self.reg_a & data;
+        self.reg_x = self.reg_a;
+        self.update_z_and_neg_flag(self.reg_a);
+        self.program_counter += 1;
+    }
+
+    fn axa(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let r = self.reg_a & self.reg_x & 0b0000_0111;
+        self.write_mem(addr, r);
+    }
+
+    fn axs(&mut self){
+        let data = self.read_mem(self.program_counter);
+        self.reg_x = self.reg_x & self.reg_a;
+        let r = self.reg_x.wrapping_sub(data);
+        self.update_z_and_neg_flag(r);
+        self.status_reg.set(CpuFlags::CARRY, self.reg_x >= data);
+        self.reg_x = r;
+        self.program_counter += 1;
+    }
+
+    fn dcp(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr).wrapping_sub(1);
+        self.write_mem(addr, data);
+        if data <= self.reg_a{
+            self.status_reg.insert(CpuFlags::CARRY);
+        }
+        self.update_z_and_neg_flag(self.reg_a.wrapping_sub(data));
+    }
+
+    fn dop(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+    }
+
+    fn isc(&mut self, mode: &AddressingMode){
+        self.inc(&mode);
+        self.sbc(&mode);
+    }
+
+    fn lar(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let r = self.read_mem(addr) & self.stack_ptr;
+        self.reg_a = r;
+        self.reg_x = r;
+        self.stack_ptr = r;
+        self.update_z_and_neg_flag(r)
+    }
+
+    fn lax(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        self.reg_a = self.read_mem(addr);
+        self.reg_x = self.read_mem(addr);
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn rla(&mut self, mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+        let d = (data << 1) | if self.status_reg.contains(CpuFlags::CARRY) {1}else {0};
+        self.write_mem(addr, d);
+        self.reg_a = self.reg_a & d;
+        self.status_reg.set(CpuFlags::CARRY, data & 0b1000_0000 != 0);
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn rra(&mut self,mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+        let d = (data >> 1) | if self.status_reg.contains(CpuFlags::CARRY) {0b1000_0000}else {0};
+        self.status_reg.set(CpuFlags::CARRY, data & 1 == 1);
+        self.write_mem(addr, d);
+        self.add_to_a(d);
+
+    }
+
+    fn slo(&mut self,mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+        self.write_mem(addr, data << 1);
+        self.status_reg.set(CpuFlags::CARRY, data & 0b1000_0000 != 0);
+        self.reg_a = self.reg_a | data << 1;
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn sre(&mut self,mode: &AddressingMode){
+        let addr = self.get_address(mode);
+        let data = self.read_mem(addr);
+        self.write_mem(addr, data >> 1);
+        self.status_reg.set(CpuFlags::CARRY, data & 0b0000_0001 == 1);
+        self.reg_a = self.reg_a ^ data >> 1;
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn sxa(&mut self){
+        let addr = self.get_address(&AddressingMode::AbsoluteY);
+        let data = ((addr >> 8) as u8).wrapping_add(1) & self.reg_x;
+        self.write_mem(addr, data);
+    }
+
+    fn sya(&mut self){
+        let addr = self.get_address(&AddressingMode::AbsoluteX);
+        let data = ((addr >> 8) as u8).wrapping_add(1) & self.reg_y;
+        self.write_mem(addr, data);
+    }
+
+    fn xaa(&mut self){
+        self.reg_a = self.reg_x;
+        let data = self.read_mem(self.program_counter);
+        self.reg_a = self.reg_a & data;
+        self.update_z_and_neg_flag(self.reg_a);
+    }
+
+    fn xas(&mut self){
+        let addr = self.get_address(&AddressingMode::AbsoluteY);
+        self.stack_ptr = self.reg_a & self.reg_x;
+        let data = ((addr >> 8) as u8).wrapping_add(1) & self.stack_ptr;
+        self.write_mem(addr, data);
+    }
+
     //whipes all registers and sets program counter to addr stored at 0xFFFC
     pub fn reset(&mut self){
         self.reg_a = 0;
@@ -554,7 +734,7 @@ impl CPU{
                 }
                 
                 //NOP
-                0xEA => continue,
+                0xEA | 0x1A | 0x3A | 0x5A | 0x7A | 0xDA | 0xFA => {},
 
                 //ADC
                 0x69 | 0x65 | 0x75 | 0x6D | 0x7D | 0x79 | 0x61 | 0x71 =>{
@@ -883,7 +1063,123 @@ impl CPU{
                 //DEY
                 0x88 => self.dey(),
 
-                _ => todo!()
+
+
+                //UNDOCUMENTED
+
+
+                //AAC
+                0x0B | 0x2B => self.aac(),
+
+                //AAX
+                0x87 | 0x97 | 0x83 | 0x8F => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.aax(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //ARR
+                0x6B => self.arr(),
+
+                //ASR
+                0x4B => self.asr(),
+
+                //AXA
+                0x9F | 0x93 => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.axa(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+
+                //AXS
+                0xCB => self.axs(),
+
+                //ATX
+                0xAB => self.atx(),
+
+                //DCP
+                0xC7 | 0xD7 | 0xCF | 0xDF | 0xDB | 0xC3 | 0xD3 => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.dcp(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+
+                //DOP
+                0x04 | 0x14 | 0x34 | 0x44 | 0x54 | 0x64 | 0x74 | 0x80 | 0x82 | 0x89 | 0xC2 | 0xD4 | 0xE2 | 0xF4 | 0x0C | 0x1C | 0x3C | 0x5C | 0x7C | 0xDC | 0xFC =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.dop(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+                
+                //ISC
+                0xE7 | 0xF7 | 0xEF | 0xFF | 0xFB | 0xE3 | 0xF3 => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.isc(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+                
+                //KIL
+                0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xB2 | 0xD2 | 0xF2 => return,
+
+                //LAR
+                0xBB => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.lar(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //LAX
+                0xA7 | 0xB7 | 0xAF | 0xBF | 0xA3 | 0xB3 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.lax(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //RLA
+                0x27 | 0x37 | 0x2F | 0x3F | 0x3B | 0x23 | 0x33 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.rla(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 - 1;
+                }
+
+                //RRA
+                0x67 | 0x77 | 0x6F | 0x7F | 0x7B | 0x63 | 0x73 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.rra(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+
+                //SBC
+                0xEB => {
+                    self.sbc(&AddressingMode::Immediate);
+                    self.program_counter += 1; 
+                }
+
+                //SLO
+                0x07 | 0x17 | 0x0F | 0x1F | 0x1B | 0x03 | 0x13 =>{
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.slo(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+
+                //SRE
+                0x47 | 0x57 | 0x4F | 0x5F | 0x5B | 0x43 | 0x53 => {
+                    let op = opcodes::OP_MAP.get(&opc).unwrap();
+                    self.sre(&op.addr_mode);
+                    self.program_counter += op.bytes as u16 -1;
+                }
+                
+                //SXA
+                0x9E => self.sxa(),
+
+                //SYA
+                0x9C =>  self.sya(),
+
+                //XAA
+                0x8B => self.xaa(),
+
+                //XAS
+                0x9B => self.xas(),
             }
         }
     }
