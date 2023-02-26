@@ -123,7 +123,7 @@ impl CPU{
         self.bus.write_mem(addr, data);
     }
 
-    fn write_mem_u16(&mut self, addr: u16, data: u16){
+    fn _write_mem_u16(&mut self, addr: u16, data: u16){
         let lo = data & 0x00FF;
         let hi = (data & 0xFF00) >> 8;
         self.write_mem(addr, lo as u8);
@@ -608,7 +608,7 @@ impl CPU{
 
     fn dop(&mut self, mode: &AddressingMode){
         let addr = self.get_address(mode);
-        let data = self.read_mem(addr);
+        let _data = self.read_mem(addr);
     }
 
     fn isc(&mut self, mode: &AddressingMode){
