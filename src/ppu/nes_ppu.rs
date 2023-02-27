@@ -19,6 +19,8 @@ pub struct PPU{
     data_buf: u8,
     oam_addr: u8,
 
+    pub scanline: u16,
+    pub cycles: usize,
 }
 
 //------------------------------------------------| 0xFFFF
@@ -51,6 +53,8 @@ impl PPU {
             status: Status::empty(),
             scroll: ScrollReg::new(),
             oam_addr: 0,
+            cycles: 0,
+            scanline:0,
         }
     }
 
@@ -164,5 +168,26 @@ impl PPU {
         } 
     }
 
-
+    pub fn tick(&mut self, cycles: u8) -> bool {
+        self.cycles += cycles as usize;
+        if self.cycles >= 341 {
+            self.cycles = self.cycles - 341;
+            self.scanline += 1;
+ 
+            if self.scanline == 241 {
+                if self.ctrl.generate_vblank_nmi() {
+                    self.status.set_vblank(true);
+                    todo!("Should trigger NMI interrupt")
+                }
+            }
+ 
+            if self.scanline >= 262 {
+                self.scanline = 0;
+                self.status.clear_vblank();
+                return true;
+            }
+        }
+        return false;
+    }
 }
+ 

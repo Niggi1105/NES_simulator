@@ -4,13 +4,15 @@ use crate::ppu::nes_ppu::PPU;
 pub struct Bus{
     cpu_vram: [u8; 2048],
     prg_rom: Vec<u8>,
-    ppu: PPU,
+    pub ppu: PPU,
+
+    pub cycles: usize,
 }
 
 
 const RAM: u16 = 0x0000;
 const RAM_MIRRORS_END: u16 = 0x1FFF;
-const PPU_REGISTERS: u16 = 0x2000;
+const _PPU_REGISTERS: u16 = 0x2000;
 const PPU_REGISTERS_MIRRORS_END: u16 = 0x3FFF;
 
 impl Bus {
@@ -20,6 +22,8 @@ impl Bus {
             cpu_vram: [0; 2048],
             prg_rom: rom.prg_rom,
             ppu: ppu,
+
+            cycles: 0,
         }
     }
 
@@ -101,4 +105,10 @@ impl Bus {
             }
         }
     }
+
+    pub fn tick(&mut self, cl: u8){
+        self.cycles += cl as usize;
+        self.ppu.tick((cl * 3).try_into().unwrap());
+    }
+    
 }

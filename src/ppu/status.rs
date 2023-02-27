@@ -41,4 +41,7 @@ impl Status {
     pub fn clear_vblank(&mut self) {
         self.remove(Status::VBLANK)
     }
+    pub fn set_vblank(&mut self,b:bool){
+        self.set(Status::VBLANK, b);
+    }
 }

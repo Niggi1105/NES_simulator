@@ -129,7 +129,7 @@ pub fn log(cpu: &mut CPU) -> String{
     let asm_str = format!("{:04x}  {:8} {: >4} {}", pc, hex_str, op.name, tmp)
         .trim()
         .to_string();
-    format!("{:47} A:{:02x} X:{:02x} Y:{:02x} P:{:02x} SP:{:02x}", asm_str, cpu.reg_a, cpu.reg_x, cpu.reg_y, cpu.status_reg.bits(), cpu.stack_ptr).to_ascii_uppercase()
+    format!("{:47} A:{:02x} X:{:02x} Y:{:02x} P:{:02x} SP:{:02x} PPU:{:>3},{:>3} CYC:{}", asm_str, cpu.reg_a, cpu.reg_x, cpu.reg_y, cpu.status_reg.bits(), cpu.stack_ptr, cpu.bus.ppu.scanline, cpu.bus.ppu.cycles, cpu.bus.cycles).to_ascii_uppercase()
 } 
 
 #[cfg(test)]

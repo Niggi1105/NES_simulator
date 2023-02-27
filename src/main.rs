@@ -15,7 +15,7 @@ fn nes_test(){
     });
 }
 
-fn dummy_read(){
+fn _dummy_read(){
     let bytes: Vec<u8> = std::fs::read("./games/cpu_dummy_reads.nes").unwrap();
     let rom = cartridge::Rom::new(&bytes).unwrap();
     let mut cpu = CPU::new(bus::Bus::new(rom));
